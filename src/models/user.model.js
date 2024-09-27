@@ -70,9 +70,6 @@ const userSchema = new Schema(
       isVerifiedToken:{
         type:String,
       },
-      isVerifyTokenExpiry:{
-        type:String,
-      },
       refreshToken: {
          type: String,
       },
