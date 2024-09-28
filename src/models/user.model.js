@@ -19,7 +19,6 @@ const userSchema = new Schema(
       },
       avatar: {
          type: String,
-         required: true,
       },
       role: {
          type: String,
@@ -29,14 +28,14 @@ const userSchema = new Schema(
       },
       isVerified: {
          type: Boolean,
-         required: true,
+         default:false
       },
       isAdmin: {
          type: Boolean,
+         default:false
       },
       bio: {
          type: String,
-         required: true,
       },
       enrolledCourses: [
          {
@@ -53,13 +52,13 @@ const userSchema = new Schema(
       subscription: {
          type: Schema.Types.ObjectId,
          ref: "Subscription",
-         required: function () {
-            return  !this.isOnTrial;
-         },
+         // required: function () {
+         //    return  !this.isOnTrial;
+         // },
       },
       isOnTrial: {
          type: Boolean, 
-         default: false,
+         // default: false,
       }, // Indicates if user is on a trial
       trialStartDate: {
          type: Date,

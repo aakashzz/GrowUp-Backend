@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import JWT from "jsonwebtoken";
-import { User } from "../models/user.model";
-import { ApiError } from "./ApiError";
+import { User } from "../models/user.model.js";
+import  ApiError  from "./ApiError.js";
 
 export const sendMail = async (
    email,
@@ -10,12 +10,11 @@ export const sendMail = async (
    fullName
 ) => {
    try {
-      const hashedToken = await JWT.sign(
+      const hashedToken = JWT.sign(
          {
-            _id: this._id,
-            email: this.email,
-            username: this.username,
-            fullName: this.fullName,
+            id: userID,
+            email: email,
+            fullName: fullName,
          },
          process.env.VERIFY_TOKEN_SECRET,
          {
@@ -47,12 +46,12 @@ export const sendMail = async (
          from: `"GrowUp" ${process.env.MAIL_AUTH_USER}`,
          to: email,
          subject: "Verify Your Email ",
-         text: `
-            Hi [name],
+         html: `
+            Hi ${fullName},
 
             We just need to verify your email address before you can access [customer portal].
 
-            Verify your email address [verification link]
+            Verify your email address <a href="/verifyemail" style>Verify email</a>
 
             Thanks! – The GrowUp team`,
       };
@@ -62,6 +61,7 @@ export const sendMail = async (
          console.log("success!");
       });
    } catch (error) {
+      console.log(error.message)
       throw new Error(error.message);
    }
 };
