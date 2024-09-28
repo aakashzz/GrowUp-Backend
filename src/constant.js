@@ -1,8 +1,7 @@
 export const verifyEmailContent = `
 Hi [name],
 
-We just need to verify your email address before you can access [customer portal].
-
-Verify your email address [verification link]
+        <p>If you did not create an account, please ignore this email.</p>
+        <p>Best regards,<br>Your Company Name</p>
 
 Thanks! – The [company] team`;

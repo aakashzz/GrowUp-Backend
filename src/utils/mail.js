@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import JWT from "jsonwebtoken";
 import { User } from "../models/user.model.js";
-import  ApiError  from "./ApiError.js";
+import ApiError from "./ApiError.js";
 
 export const sendMail = async (
    email,
@@ -18,9 +18,11 @@ export const sendMail = async (
          },
          process.env.VERIFY_TOKEN_SECRET,
          {
-            expiresIn: process.env.VERIFY_TOKEN_EXPIRY,
+            expiresIn: "1h",
          }
       );
+
+      console.log(hashedToken);
 
       if (emailType === "VERIFY") {
          await User.findByIdAndUpdate(userID, {
@@ -32,7 +34,7 @@ export const sendMail = async (
          throw new ApiError(500, "Other mailing process not execute");
       }
 
-      const auth = nodemailer.createTransport({
+      const transport = nodemailer.createTransport({
          service: "gmail",
          secure: true,
          port: process.env.MAIL_PORT,
@@ -42,26 +44,28 @@ export const sendMail = async (
          },
       });
 
+      //TODO: More concistant email content sental ment noted content adjustment 
+
       const receiver = {
-         from: `"GrowUp" ${process.env.MAIL_AUTH_USER}`,
+         from: `"GrowUp-Learning" ${process.env.MAIL_AUTH_USER}`,
          to: email,
          subject: "Verify Your Email ",
          html: `
-            Hi ${fullName},
-
-            We just need to verify your email address before you can access [customer portal].
-
-            Verify your email address <a href="/verifyemail" style>Verify email</a>
-
-            Thanks! – The GrowUp team`,
+               <h2 >Hii ${fullName}</h2>
+               <p>We just need to verify your email address before you can access GrowUp learning platform.</p>
+                  <p style="font-size:10px; font-weight:semibold" >Verify your email address
+                  <a href="YOUR_VERIFICATION_LINK" style="display: inline-block; background-color: #3772FF; color: white; font-family: 'Inter', sans-serif; padding: 6px 10px; text-decoration: none; border-radius: 5px; font-size: 13px; font-weight: bold;">
+                     Verify Email
+                  </a>
+                  <br>
+                  Thanks! – The GrowUp-Learning team
+            </p>`,
       };
 
-      auth.sendMail(receiver, (error) => {
-         if (error) throw error;
-         console.log("success!");
-      });
+      const mailResponse = await transport.sendMail(receiver);
+      return mailResponse;
    } catch (error) {
-      console.log(error.message)
-      throw new Error(error.message);
+      console.log("Error", error.message);
+      throw new Error("Error in mailing", error.message);
    }
 };
