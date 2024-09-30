@@ -3,8 +3,14 @@ import ApiError from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { sendMail } from "../utils/mail.js";
 import ApiResponse from "../utils/ApiResponse.js";
-import { generateAccessToken, generateRefreshToken } from "../utils/generateToken.js";
+import {
+   generateAccessToken,
+   generateRefreshToken,
+} from "../utils/generateToken.js";
+import JWT from "jsonwebtoken";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
+//registerUser controller
 const registerUser = asyncHandler(async (req, res) => {
    //frontend-inp -> receive
    //check filed not empty
@@ -88,27 +94,177 @@ const loginUser = asyncHandler(async (req, res) => {
          "Your email is not verify please verify your email !."
       );
    }
-   //password check 
-   const isPasswordChecked = await existedUser.IsPasswordCorrect(password)
+   //password check
+   const isPasswordChecked = await existedUser.IsPasswordCorrect(password);
    if (!isPasswordChecked) {
-      throw new ApiError(400,"Password Incorrect!");
+      throw new ApiError(400, "Password Incorrect!");
    }
+
    //generate tokens to login user
-   const {accessToken} =  generateAccessToken(existedUser._id,existedUser.email);
-   const {refreshToken} =  generateRefreshToken(existedUser._id);
-   let options = {httpOnly:true,secure:true}
-   return res.status(200)
-   .cookie("accessToken",accessToken,options)
-   .cookie("refreshToken",refreshToken,options)
-   .json(
-      new ApiResponse(200,
-         {
-            user:existedUser,
-            accessToken,
-            refreshToken
-         },
-         "Logged-in SuccessFully"
-      )
-   )
+
+   const { accessToken } = generateAccessToken(
+      existedUser._id,
+      existedUser.email
+   );
+   const { refreshToken } = generateRefreshToken(existedUser._id);
+
+   //adding refreshToken in database
+
+   existedUser.refreshToken = refreshToken;
+   existedUser.save({ validateBeforeSave: false });
+
+   //return response
+   let options = { httpOnly: true, secure: true };
+   return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(
+         new ApiResponse(
+            200,
+            {
+               user: existedUser,
+               accessToken,
+               refreshToken,
+            },
+            "Logged-in SuccessFully"
+         )
+      );
 });
-export { registerUser, loginUser };
+
+//logout functionality
+const logoutUser = asyncHandler(async (req, res) => {
+   const { id } = req.user;
+   await User.findByIdAndUpdate(
+      id,
+      {
+         $unset: {
+            refreshToken: 1,
+         },
+      },
+      {
+         new: true,
+      }
+   );
+   let options = { httpOnly: true, secure: true };
+   return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(new ApiResponse(200, {}, "User Logout SuccessFully"));
+});
+
+//refreshAccessToken controller
+const refreshAccessToken = asyncHandler(async (req, res) => {
+   const incomingRefreshToken =
+      req.cookies?.refreshToken || req.body.refreshToken;
+
+   if (!incomingRefreshToken) throw new ApiError(401, "Unauthorized Request");
+
+   try {
+      const decodedToken = JWT.verify(
+         incomingRefreshToken,
+         REFRESH_TOKEN_SECRET
+      );
+
+      const user = await User.findById(decodedToken.id);
+
+      if (incomingRefreshToken !== user?.refreshToken) {
+         throw new ApiError(400, "Refresh Token is expire and used");
+      }
+
+      const { accessToken } = generateAccessToken(user._id, user.email);
+      const { newRefreshToken } = generateRefreshToken(user._id);
+
+      //adding refreshToken in database
+
+      user.refreshToken = newRefreshToken;
+      user.save({ validateBeforeSave: false });
+
+      //return response
+      let options = { httpOnly: true, secure: true };
+      return res
+         .status(200)
+         .cookie("accessToken", accessToken, options)
+         .cookie("refreshToken", newRefreshToken, options)
+         .json(
+            new ApiResponse(
+               200,
+               {
+                  accessToken,
+                  refreshToken: newRefreshToken,
+               },
+               "Access Token Refresh"
+            )
+         );
+   } catch (error) {
+      throw new ApiError(401, error?.message || "Invalid refresh token");
+   }
+});
+
+//changePassword
+const updatePassword = asyncHandler(async (req, res) => {
+   const { oldPassword, newPassword } = req.body;
+   if ([oldPassword, newPassword].some((field) => field?.trim() === "")) {
+      throw new ApiError(400, "All Filed is required");
+   }
+   const user = await User.findById(req.user?.id).select(
+      "-refreshToken -subscription"
+   );
+
+   const isPasswordCheck = await user.IsPasswordCorrect(oldPassword);
+
+   if (!isPasswordCheck) {
+      throw new ApiError(400, "Old Password is not correct");
+   }
+
+   user.password = newPassword;
+   await user.save({ validateBeforeSave: false });
+
+   return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Your Password Is Updated"));
+});
+
+//getUser details
+const getUserProfileDetail = asyncHandler(async (req, res) => {
+   return res
+      .status(200)
+      .json(new ApiResponse(200, req.user, "Getting User Profile details"));
+});
+
+//uploadProfile
+
+const uploadUserProfilePicture = asyncHandler(async (req, res) => {
+   const filePath = req.files?.avatar[0]?.path;
+   console.log(req.files);
+
+   if (filePath) return new ApiError(400, "File Path Required");
+   const profilePicture = await uploadOnCloudinary(filePath);
+   console.log(profilePicture);
+
+   const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+         $set: {
+            avatar: profilePicture.url,
+         },
+      },
+      {
+         new: true,
+      }
+   ).select("-password, -refreshToken -subscription");
+
+   await user.save();
+
+   return res.status(200).json(new ApiResponse(200, user));
+});
+export {
+   registerUser,
+   loginUser,
+   logoutUser,
+   refreshAccessToken,
+   updatePassword,
+   getUserProfileDetail,
+   uploadUserProfilePicture,
+};

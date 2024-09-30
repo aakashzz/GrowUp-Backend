@@ -1,6 +1,5 @@
 import { Schema, model } from "mongoose";
 import bcrypt from "bcrypt";
-import JWT from 'jsonwebtoken'
 
 const userSchema = new Schema(
    {
@@ -24,7 +23,7 @@ const userSchema = new Schema(
       },
       role: {
          type: String,
-         enum: ["student", "instructor"],
+         enum: ["student", "instructor","admin"],
          required: true,
          default: "student",
       },
