@@ -9,17 +9,26 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export const uploadOnCloudinary = async (localPath) => {
+export const uploadOnCloudinary = async (localPath,type) => {
     try {
-        if(!localPath) return null;
-        const response = await cloudinary.uploader.upload(localPath,{
-            resource_type:"auto",
-        })
-        fs.unlink(localPath);
-        console.log(response);
-        return response;
+        if(!localPath)throw new ApiError(400,"LocalPath Not Here");
+        let response;
+        if (type === "PROFILE-PICTURE") {
+             response = await cloudinary.uploader.upload(localPath,{
+                resource_type:"auto",
+            })
+        }else if (type === "COURSE-VIDEO") {
+            response = await cloudinary.v2.uploader.upload_large("elephants_4k.mp4", 
+                { resource_type: "video"});
+        }
+        const optimizeUrl = cloudinary.url(response.public_id, {
+            fetch_format: 'auto',
+            quality:"100"
+        });
+        fs.unlinkSync(localPath);
+        return {optimizeUrl}
     } catch (error) {
         fs.unlinkSync(localPath)
-        throw new ApiError(500,error?.message)
+        throw new ApiError(500,"Cloudinary Service file: " + error?.message)
     }
 }

@@ -234,31 +234,61 @@ const getUserProfileDetail = asyncHandler(async (req, res) => {
 });
 
 //uploadProfile
-
 const uploadUserProfilePicture = asyncHandler(async (req, res) => {
-   const filePath = req.files?.avatar[0]?.path;
-   console.log(req.files);
+   const filePath = req.file?.path;
+   
+   if(!filePath) throw new ApiError(400, "File Path Required");
+   const {optimizeUrl} = await uploadOnCloudinary(filePath,"PROFILE-PICTURE");
 
-   if (filePath) return new ApiError(400, "File Path Required");
-   const profilePicture = await uploadOnCloudinary(filePath);
-   console.log(profilePicture);
-
+   if(!optimizeUrl) throw new ApiError(500, "Upload UnsuccessFully");
    const user = await User.findByIdAndUpdate(
       req.user._id,
       {
          $set: {
-            avatar: profilePicture.url,
+            avatar: optimizeUrl,
          },
       },
       {
          new: true,
       }
-   ).select("-password, -refreshToken -subscription");
-
+   ).select("-password -refreshToken -subscription");
    await user.save();
 
-   return res.status(200).json(new ApiResponse(200, user));
+   return res.status(200).json(new ApiResponse(200, user,"Profile Upload SuccessFully"));
 });
+
+//update User details
+const updateUserDetails = asyncHandler(async (req,res) =>{
+   const {fullName, bio} = req.body;
+
+   if(!(fullName || bio)) throw new ApiError(400,"Field are empty")
+
+   const updatedUserDetails = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set:{
+         fullName:fullName,
+         bio:bio
+        }
+      },
+      {
+         new:true,
+      }
+   ).select("-password -refreshToken -subscription")
+
+   if(!updatedUserDetails) throw new ApiError(500,"Not Updating User Details");
+   await updatedUserDetails.save();
+
+   return res.status(200).json(
+      new ApiResponse(200,updatedUserDetails,"User Details Updated")
+   )
+
+})
+
+const forgotPassword = asyncHandler(async(req,res)=>{
+   const {email, otp} = req.body;
+})
+
 export {
    registerUser,
    loginUser,
@@ -267,4 +297,5 @@ export {
    updatePassword,
    getUserProfileDetail,
    uploadUserProfilePicture,
+   updateUserDetails,
 };
