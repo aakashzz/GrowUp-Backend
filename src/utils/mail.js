@@ -3,12 +3,7 @@ import JWT from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 import ApiError from "./ApiError.js";
 
-export const sendMail = async (
-   email,
-   emailType = "VERIFY",
-   userID,
-   fullName
-) => {
+export const sendMail = async (email,emailType,userID,fullName) => {
    try {
       const hashedToken = JWT.sign(
          {
@@ -22,16 +17,26 @@ export const sendMail = async (
          }
       );
 
-      console.log(hashedToken);
-
       if (emailType === "VERIFY") {
          await User.findByIdAndUpdate(userID, {
             $set: {
                isVerifiedToken: hashedToken,
-            },
-         });
+            }
+         },{
+            new:true,
+         }
+      );
+      } else if (emailType === "FORGOT_PASSWORD") {
+         await User.findByIdAndUpdate(userID, {
+            $set: {
+               forgotPasswordToken: hashedToken,
+            }
+         },{
+            new:true
+         }
+      )
       } else {
-         throw new ApiError(500, "Other mailing process not execute");
+         throw new ApiError(500, "Invalid email type");
       }
 
       const transport = nodemailer.createTransport({
@@ -44,28 +49,31 @@ export const sendMail = async (
          },
       });
 
-      //TODO: More concistant email content sental ment noted content adjustment 
 
       const receiver = {
          from: `"GrowUp-Learning" ${process.env.MAIL_AUTH_USER}`,
          to: email,
-         subject: "Verify Your Email ",
+         subject: emailType === "VERIFY" ? "Verify Your Email" : "Forgot Your Password",
          html: `
-               <h2 >Hii ${fullName}</h2>
-               <p>We just need to verify your email address before you can access GrowUp learning platform.</p>
-                  <p style="font-size:10px; font-weight:semibold" >Verify your email address
-                  <a href="YOUR_VERIFICATION_LINK" style="display: inline-block; background-color: #3772FF; color: white; font-family: 'Inter', sans-serif; padding: 6px 10px; text-decoration: none; border-radius: 5px; font-size: 13px; font-weight: bold;">
-                     Verify Email
+            <h2>Hi ${fullName}</h2>
+            <p>${emailType === "VERIFY" ? "We just need to verify your email address before you can access GrowUp learning platform." : "We received a request to reset your password for your GrowUp-Learning account."}
+            </p>
+            <p>
+                  <a href="${process.env.DOMAIN}/${emailType === "VERIFY" ? "verify-email":"update-forgot-password"}?token=${hashedToken}" style="display: inline-block; background-color: #3772FF; color: white; font-family: 'Inter', sans-serif; padding: 6px 10px; text-decoration: none; border-radius: 5px; font-size: 13px; font-weight: bold;">
+                     ${emailType === 'VERIFY' ? "Verify Email":"Recover Password"}
                   </a>
-                  <br>
-                  Thanks! – The GrowUp-Learning team
-            </p>`,
+            </p> 
+            
+            
+            <p>Thanks! – The GrowUp-Learning team</p>
+         `
       };
 
       const mailResponse = await transport.sendMail(receiver);
       return mailResponse;
    } catch (error) {
       console.log("Error", error.message);
-      throw new Error("Error in mailing", error.message);
+      throw new Error("Error in mailing", error);
    }
 };
+

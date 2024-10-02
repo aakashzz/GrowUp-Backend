@@ -285,8 +285,59 @@ const updateUserDetails = asyncHandler(async (req,res) =>{
 
 })
 
-const forgotPassword = asyncHandler(async(req,res)=>{
-   const {email, otp} = req.body;
+const sendUserForgotPasswordMail = asyncHandler(async(req,res)=>{
+   const {email} = req.body;
+   if(!email) throw new ApiError(400,"Required Filed Are Empty");
+   const findUser = await User.findOne({email})
+
+   if(!findUser) throw new ApiError(400,"Email Are Not Valid");
+
+   const sendingEmail = await sendMail(findUser.email,"FORGOT_PASSWORD",findUser._id,findUser.fullName);
+   
+   if(!sendingEmail) throw new ApiError(500,"Not Sending mail");
+
+   console.log(sendingEmail.response);
+   return res.status(200).json(
+      new ApiResponse(200,findUser,"message send")
+   )
+
+})
+
+const verifyUserEmail = asyncHandler(async (req,res) =>{
+   const {token} = req.body;
+   
+   const decodedValue = JWT.verify(token, process.env.VERIFY_TOKEN_SECRET);
+   if(!decodedValue) throw new ApiError(400,"Unauthorize token");
+
+   const user = await User.findById(decodedValue.id);
+
+   user.isVerified = true;
+   user.isVerifiedToken = undefined;
+
+   await user.save();
+
+   return res.status(200).json(
+      new ApiResponse(200,user,"User Email Is Verified")
+   )
+
+})
+const forgotPasswordUpdate = asyncHandler(async (req,res) =>{
+   const {newPassword, confirmPassword, token} = req.body;
+
+   if(newPassword !== confirmPassword) throw new ApiError(400,"Password Not match")
+   
+   const decodedValue = JWT.verify(token, process.env.VERIFY_TOKEN_SECRET);
+   if(!decodedValue) throw new ApiError(400,"Unauthorize token");
+
+   const user = await User.findById(decodedValue.id);
+   
+   user.forgotPasswordToken = undefined;
+   user.password = newPassword;
+
+   await user.save();
+   return res.status(200).json(
+      new ApiResponse(200,user,"User Forgot Password Is Verified Next Move to Update Password")
+   )
 })
 
 export {
@@ -298,4 +349,7 @@ export {
    getUserProfileDetail,
    uploadUserProfilePicture,
    updateUserDetails,
+   forgotPasswordUpdate,
+   verifyUserEmail,
+   sendUserForgotPasswordMail
 };

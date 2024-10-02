@@ -73,6 +73,9 @@ const userSchema = new Schema(
       refreshToken: {
          type: String,
       },
+      forgotPasswordToken:{
+         type:String,
+      }
    },
    { timestamps: true }
 );
